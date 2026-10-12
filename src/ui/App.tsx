@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import type {LambdaTerm} from '../core/ast';
 import {LambdaSyntaxError, parseLambda} from '../core/parser';
 import {canReduce, formatLambda, reduceOnce} from '../core/reducer';
+import {expandLambdaShorthands} from '../core/shorthands';
 import {LambdaCanvas} from './LambdaCanvas';
 
 interface Example {
@@ -9,44 +10,64 @@ interface Example {
   readonly label: string;
 }
 
+interface OptionToggleProps {
+  readonly checked: boolean;
+  readonly label: string;
+  readonly onChange: (checked: boolean) => void;
+}
+
 const EXAMPLES: readonly Example[] = [
-  {label: 'Identity', expression: '(λx.x) (λy.y)'},
-  {label: 'Constant', expression: '(λx.λy.x) a b'},
-  {label: 'Composition', expression: '(λf.λg.λx.f (g x)) (λn.n) (λm.m)'},
-  {label: 'Boolean true', expression: '(λt.λf.t) a b'},
-  {label: 'Church successor', expression: '(λn.λf.λx.f (n f x)) (λf.λx.f x)'},
+  {label: 'Identity', expression: 'I (λy.y)'},
+  {label: 'Returning a lambda', expression: '(λx.λy.x) a'},
+  {label: 'Beta reduction', expression: '(λz.z z) (λx.λy.x)'},
+  {label: 'Boolean true', expression: 'T a b'},
+  {label: 'Successor', expression: '> 2'},
+  {label: 'Addition', expression: '+ 2 3'},
+  {label: 'Multiplication', expression: '* 2 3'},
+  {label: 'Exponentiation', expression: '^ 2 3'},
   {label: 'Omega', expression: '(λx.x x) (λx.x x)'},
 ];
 
-const INITIAL_EXPRESSION = EXAMPLES[0].expression;
+const INITIAL_EXPRESSION = '* 2 3';
 const MAX_AUTOMATIC_STEPS = 250;
+
+function parseSource(source: string): LambdaTerm {
+  return parseLambda(expandLambdaShorthands(source));
+}
 
 export function App(): React.JSX.Element {
   const [source, setSource] = useState(INITIAL_EXPRESSION);
-  const [term, setTerm] = useState<LambdaTerm>(() => parseLambda(INITIAL_EXPRESSION));
+  const [initialSource, setInitialSource] = useState(INITIAL_EXPRESSION);
+  const [term, setTerm] = useState<LambdaTerm>(() => parseSource(INITIAL_EXPRESSION));
   const [initialTerm, setInitialTerm] = useState<LambdaTerm>(term);
   const [history, setHistory] = useState<readonly string[]>([formatLambda(term)]);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [stepCount, setStepCount] = useState(0);
+  const [expandShorthands, setExpandShorthands] = useState(false);
+  const [animateSubstitutions, setAnimateSubstitutions] = useState(true);
+  const [updateExpression, setUpdateExpression] = useState(true);
   const isReducible = useMemo(() => canReduce(term), [term]);
-  const animationDuration = Math.round(620 / speed);
+  const animationDuration = animateSubstitutions ? Math.round(620 / speed) : 0;
 
   const applyReduction = useCallback((): boolean => {
     const result = reduceOnce(term);
     if (!result.changed) {
+      setSource(formatLambda(term));
       setIsPlaying(false);
       return false;
     }
 
     const formatted = formatLambda(result.term);
     setTerm(result.term);
-    setSource(formatted);
+    if (updateExpression || !isPlaying) {
+      setSource(formatted);
+    }
     setHistory((items) => [...items, formatted]);
     setStepCount((count) => count + 1);
     return true;
-  }, [term]);
+  }, [isPlaying, term, updateExpression]);
 
   useEffect(() => {
     if (!isPlaying) {
@@ -54,6 +75,7 @@ export function App(): React.JSX.Element {
     }
 
     if (!isReducible || stepCount >= MAX_AUTOMATIC_STEPS) {
+      setSource(formatLambda(term));
       setIsPlaying(false);
       return;
     }
@@ -63,7 +85,7 @@ export function App(): React.JSX.Element {
       Math.max(animationDuration + 80, 140),
     );
     return () => window.clearTimeout(timeout);
-  }, [animationDuration, applyReduction, isPlaying, isReducible, stepCount]);
+  }, [animationDuration, applyReduction, isPlaying, isReducible, stepCount, term]);
 
   function handleSourceChange(value: string): void {
     const normalizedValue = value.replaceAll('\\', 'λ');
@@ -71,9 +93,10 @@ export function App(): React.JSX.Element {
     setIsPlaying(false);
 
     try {
-      const parsedTerm = parseLambda(normalizedValue);
+      const parsedTerm = parseSource(normalizedValue);
       setTerm(parsedTerm);
       setInitialTerm(parsedTerm);
+      setInitialSource(normalizedValue);
       setHistory([formatLambda(parsedTerm)]);
       setStepCount(0);
       setError(null);
@@ -83,23 +106,48 @@ export function App(): React.JSX.Element {
   }
 
   function loadExample(expression: string): void {
-    const parsedTerm = parseLambda(expression);
-    setSource(expression);
-    setTerm(parsedTerm);
-    setInitialTerm(parsedTerm);
-    setHistory([formatLambda(parsedTerm)]);
+    const visibleExpression = expandShorthands ?
+      expandLambdaShorthands(expression) : expression;
+    handleSourceChange(visibleExpression);
+  }
+
+  function toggleShorthandExpansion(checked: boolean): void {
+    setExpandShorthands(checked);
+    if (checked) {
+      handleSourceChange(expandLambdaShorthands(source));
+    }
+  }
+
+  function reset(): void {
+    setTerm(initialTerm);
+    setSource(initialSource);
+    setHistory([formatLambda(initialTerm)]);
     setStepCount(0);
     setError(null);
     setIsPlaying(false);
   }
 
-  function reset(): void {
-    setTerm(initialTerm);
-    setSource(formatLambda(initialTerm));
-    setHistory([formatLambda(initialTerm)]);
-    setStepCount(0);
-    setError(null);
-    setIsPlaying(false);
+  function downloadDiagram(): void {
+    const canvas = document.querySelector<HTMLCanvasElement>('.lambda-canvas');
+    if (canvas === null) {
+      return;
+    }
+    const link = document.createElement('a');
+    link.download = 'lambda-diagram.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+
+  async function toggleFullscreen(): Promise<void> {
+    const canvasWrap = document.querySelector<HTMLElement>('.canvas-wrap');
+    if (canvasWrap === null) {
+      return;
+    }
+    if (document.fullscreenElement === null) {
+      await canvasWrap.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
   }
 
   return (
@@ -122,43 +170,92 @@ export function App(): React.JSX.Element {
 
       <main id="top">
         <section className="hero">
-          <p className="eyebrow">Interactive lambda calculus</p>
-          <h1>Watch expressions<br />reduce into shape.</h1>
+          <div className="hero-mark">λ</div>
+          <p className="eyebrow">Interactive visualizer</p>
+          <h1>Lambda Calculus</h1>
           <p className="hero-copy">
-            Build a lambda term, follow every binding, and step through beta
-            reduction as the diagram reorganizes itself.
+            Enter a lambda expression and watch its bindings reorganize through
+            beta reduction. Type <code>\</code> to insert a lambda.
           </p>
         </section>
 
+        <div className="example-row">
+          <div className="select-wrap compact-select">
+            <select
+              aria-label="Examples"
+              defaultValue=""
+              onChange={(event) => {
+                if (event.target.value !== '') {
+                  loadExample(event.target.value);
+                }
+              }}
+            >
+              <option value="" disabled>Examples</option>
+              {EXAMPLES.map((example) => (
+                <option key={example.label} value={example.expression}>
+                  {example.label}
+                </option>
+              ))}
+            </select>
+            <ChevronIcon />
+          </div>
+        </div>
+
         <section className="workspace" aria-label="Lambda calculus workspace">
+          <aside className="option-panel" aria-label="Diagram options">
+            <OptionToggle
+              checked={expandShorthands}
+              label="Expand shorthands"
+              onChange={toggleShorthandExpansion}
+            />
+            <OptionToggle
+              checked={animateSubstitutions}
+              label="Animate single substitutions"
+              onChange={setAnimateSubstitutions}
+            />
+            <OptionToggle
+              checked={updateExpression}
+              label="Update expression during reduction"
+              onChange={setUpdateExpression}
+            />
+          </aside>
+
           <div className="workspace-main">
-            <div className="canvas-heading">
-              <div>
-                <p className="section-kicker">Diagram</p>
-                <h2>Binding map</h2>
-              </div>
-              <div className="status-group">
-                <span className={`status-dot ${isPlaying ? 'active' : ''}`} />
-                <span>{isPlaying ? 'Reducing' : isReducible ? 'Ready' : 'Normal form'}</span>
-                <span className="step-counter">β {stepCount}</span>
-              </div>
-            </div>
             <div className="canvas-wrap">
               <LambdaCanvas
                 animationDuration={animationDuration}
                 term={term}
               />
-              <div className="canvas-legend">
-                <span><i className="legend-line" /> bound variable</span>
-                <span><i className="legend-line neutral" /> free variable</span>
+              <button
+                aria-label="Show diagram guide"
+                className="canvas-tool help-tool"
+                onClick={() => document.querySelector('.notation-note')?.scrollIntoView({
+                  behavior: 'smooth',
+                })}
+                type="button"
+              >
+                ?
+              </button>
+              <button
+                aria-label="Toggle fullscreen"
+                className="canvas-tool fullscreen-tool"
+                onClick={() => void toggleFullscreen()}
+                type="button"
+              >
+                <FullscreenIcon />
+              </button>
+              <div className="canvas-status">
+                <span className={`status-dot ${isPlaying ? 'active' : ''}`} />
+                <span>{isPlaying ? 'Reducing' : isReducible ? 'Ready' : 'Normal form'}</span>
+                <span>β {stepCount}</span>
               </div>
             </div>
           </div>
 
           <aside className="control-panel">
-            <div className="panel-section expression-section">
-              <label htmlFor="expression">Expression</label>
+            <div className="expression-section">
               <textarea
+                aria-label="Expression"
                 aria-describedby={error === null ? 'expression-help' : 'expression-error'}
                 className={error === null ? '' : 'invalid'}
                 id="expression"
@@ -166,75 +263,35 @@ export function App(): React.JSX.Element {
                 spellCheck={false}
                 value={source}
               />
-              <div className="input-meta">
-                <span id={error === null ? 'expression-help' : 'expression-error'}>
-                  {error ?? 'Use λ or \\ to create an abstraction.'}
-                </span>
-                <span>{source.length}</span>
-              </div>
-            </div>
-
-            <div className="panel-section">
-              <label htmlFor="example">Examples</label>
-              <div className="select-wrap">
-                <select
-                  defaultValue=""
-                  id="example"
-                  onChange={(event) => {
-                    if (event.target.value !== '') {
-                      loadExample(event.target.value);
-                    }
-                  }}
-                >
-                  <option value="" disabled>Choose an expression</option>
-                  {EXAMPLES.map((example) => (
-                    <option key={example.label} value={example.expression}>
-                      {example.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronIcon />
-              </div>
-            </div>
-
-            <div className="panel-section action-section">
-              <button
-                className="primary-action"
-                disabled={error !== null || !isReducible}
-                onClick={() => setIsPlaying((playing) => !playing)}
-                type="button"
+              <label htmlFor="expression">Expression</label>
+              <span
+                className={`expression-message ${error === null ? '' : 'error'}`}
+                id={error === null ? 'expression-help' : 'expression-error'}
               >
-                {isPlaying ? <PauseIcon /> : <PlayIcon />}
-                {isPlaying ? 'Pause' : 'Reduce'}
-              </button>
+                {error ?? `${source.length} characters`}
+              </span>
+            </div>
+
+            <div className="action-section primary-actions">
               <button
-                aria-label="Reduce one step"
-                className="icon-action"
                 disabled={error !== null || !isReducible || isPlaying}
-                onClick={applyReduction}
-                title="Reduce one step"
+                onClick={() => setIsPlaying(true)}
                 type="button"
               >
-                <StepIcon />
+                Reduce
               </button>
               <button
-                aria-label="Reset expression"
-                className="icon-action"
-                disabled={stepCount === 0}
-                onClick={reset}
-                title="Reset expression"
+                disabled={!isPlaying}
+                onClick={() => setIsPlaying(false)}
                 type="button"
               >
-                <ResetIcon />
+                Pause
               </button>
             </div>
 
-            <div className="panel-section speed-section">
-              <div className="range-heading">
-                <label htmlFor="speed">Animation speed</label>
-                <output>{speed.toFixed(2)}×</output>
-              </div>
+            <div className="speed-section">
               <input
+                aria-label="Animation speed"
                 id="speed"
                 max="2.5"
                 min="0.25"
@@ -243,18 +300,35 @@ export function App(): React.JSX.Element {
                 type="range"
                 value={speed}
               />
-              <div className="range-labels"><span>Slow</span><span>Fast</span></div>
+              <label htmlFor="speed">Animation Speed: {speed.toFixed(2)}</label>
             </div>
 
-            <div className="panel-section history-section">
+            <div className="action-section secondary-actions">
+              <button
+                disabled={error !== null || !isReducible || isPlaying}
+                onClick={applyReduction}
+                type="button"
+              >
+                Step
+              </button>
+              <button disabled={stepCount === 0} onClick={reset} type="button">
+                Reset
+              </button>
+            </div>
+
+            <button className="download-button" onClick={downloadDiagram} type="button">
+              Download
+            </button>
+
+            <div className="history-section">
               <div className="history-heading">
-                <span>Reduction history</span>
+                <span>History</span>
                 <span>{history.length}</span>
               </div>
               <ol>
-                {history.slice(-6).map((expression, index) => (
+                {history.slice(-4).map((expression, index) => (
                   <li key={`${index}-${expression}`}>
-                    <span>{Math.max(0, history.length - 6) + index}</span>
+                    <span>{Math.max(0, history.length - 4) + index}</span>
                     <code>{expression}</code>
                   </li>
                 ))}
@@ -264,9 +338,9 @@ export function App(): React.JSX.Element {
         </section>
 
         <section className="notation-note">
-          <span className="note-number">01</span>
+          <span className="note-number">Guide</span>
           <div>
-            <h2>Read the lines</h2>
+            <h2>Reading the diagram</h2>
             <p>
               A horizontal line introduces a lambda. Every vertical line below
               it traces an occurrence of the bound variable. Applications join
@@ -284,27 +358,29 @@ export function App(): React.JSX.Element {
   );
 }
 
+function OptionToggle({
+  checked,
+  label,
+  onChange,
+}: OptionToggleProps): React.JSX.Element {
+  return (
+    <label className="option-toggle">
+      <input
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        type="checkbox"
+      />
+      <span className="checkbox-mark" />
+      <span>{label}</span>
+    </label>
+  );
+}
+
 function formatError(error: unknown): string {
   if (error instanceof LambdaSyntaxError) {
     return `${error.message} Position ${error.position + 1}.`;
   }
   return 'The expression could not be parsed.';
-}
-
-function PlayIcon(): React.JSX.Element {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z" /></svg>;
-}
-
-function PauseIcon(): React.JSX.Element {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM14 5h4v14h-4z" /></svg>;
-}
-
-function StepIcon(): React.JSX.Element {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 5 9 7-9 7V5Zm10 0h2v14h-2V5Z" /></svg>;
-}
-
-function ResetIcon(): React.JSX.Element {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.2 7.8A7 7 0 1 1 5 14h2a5 5 0 1 0 1-3l3 3H3V6l3.2 1.8Z" /></svg>;
 }
 
 function ChevronIcon(): React.JSX.Element {
@@ -313,4 +389,12 @@ function ChevronIcon(): React.JSX.Element {
 
 function ExternalIcon(): React.JSX.Element {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M17 13v6H5V7h6" /></svg>;
+}
+
+function FullscreenIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+    </svg>
+  );
 }
