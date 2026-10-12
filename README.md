@@ -2,6 +2,10 @@
 
 An interactive lambda calculus visualizer with animated beta reduction.
 
+Each animated step pauses on the next beta redex before substitution. The
+redex, argument, and replaced variable occurrences receive separate colors,
+and cloned arguments retain their visual identity while moving into place.
+
 ## Expression syntax
 
 Function application is written by juxtaposition, so addition is `+ 2 3`

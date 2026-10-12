@@ -1,6 +1,11 @@
 import {describe, expect, it} from 'vitest';
 import {parseLambda} from './parser';
-import {canReduce, formatLambda, reduceOnce} from './reducer';
+import {
+  canReduce,
+  findNextReduction,
+  formatLambda,
+  reduceOnce,
+} from './reducer';
 
 describe('reduceOnce', () => {
   it('reduces the identity function', () => {
@@ -23,5 +28,15 @@ describe('reduceOnce', () => {
     const term = parseLambda('λx.x');
     expect(canReduce(term)).toBe(false);
     expect(reduceOnce(term).changed).toBe(false);
+  });
+
+  it('describes the redex, argument, and substitution targets', () => {
+    const term = parseLambda('(λx.x x) (λy.y)');
+    const focus = findNextReduction(term);
+
+    expect(focus?.parameter).toBe('x');
+    expect(focus?.redexIds.size).toBe(5);
+    expect(focus?.argumentIds.size).toBe(2);
+    expect(focus?.occurrenceIds.size).toBe(2);
   });
 });

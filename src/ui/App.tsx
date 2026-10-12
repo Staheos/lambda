@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import type {LambdaTerm} from '../core/ast';
 import {LambdaSyntaxError, parseLambda} from '../core/parser';
 import {canReduce, formatLambda, reduceOnce} from '../core/reducer';
@@ -17,6 +17,11 @@ interface OptionToggleProps {
   readonly checked: boolean;
   readonly label: string;
   readonly onChange: (checked: boolean) => void;
+}
+
+interface PendingDisplayUpdate {
+  readonly formatted: string;
+  readonly updateSource: boolean;
 }
 
 const EXAMPLES: readonly Example[] = [
@@ -59,6 +64,8 @@ export function App(): React.JSX.Element {
   const [history, setHistory] = useState<readonly string[]>([formatLambda(term)]);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const pendingDisplayUpdateRef = useRef<PendingDisplayUpdate | null>(null);
   const [speed, setSpeed] = useState(1);
   const [stepCount, setStepCount] = useState(0);
   const [expandShorthands, setExpandShorthands] = useState(false);
@@ -66,7 +73,7 @@ export function App(): React.JSX.Element {
   const [animateSubstitutions, setAnimateSubstitutions] = useState(true);
   const [updateExpression, setUpdateExpression] = useState(true);
   const isReducible = useMemo(() => canReduce(term), [term]);
-  const animationDuration = animateSubstitutions ? Math.round(620 / speed) : 0;
+  const animationDuration = animateSubstitutions ? Math.round(1_200 / speed) : 0;
 
   const applyReduction = useCallback((): boolean => {
     const result = reduceOnce(term);
@@ -78,13 +85,44 @@ export function App(): React.JSX.Element {
 
     const formatted = formatForDisplay(result.term, collapseShorthands);
     setTerm(result.term);
-    if (updateExpression || !isPlaying) {
-      setSource(formatted);
+    const shouldUpdateSource = updateExpression || !isPlaying;
+    if (animationDuration > 0) {
+      pendingDisplayUpdateRef.current = {
+        formatted,
+        updateSource: shouldUpdateSource,
+      };
+    } else {
+      if (shouldUpdateSource) {
+        setSource(formatted);
+      }
+      setHistory((items) => [...items, formatted]);
     }
-    setHistory((items) => [...items, formatted]);
     setStepCount((count) => count + 1);
     return true;
-  }, [collapseShorthands, isPlaying, term, updateExpression]);
+  }, [
+    animationDuration,
+    collapseShorthands,
+    isPlaying,
+    term,
+    updateExpression,
+  ]);
+
+  const handleAnimationStateChange = useCallback((animating: boolean): void => {
+    setIsAnimating(animating);
+    if (animating) {
+      return;
+    }
+
+    const pending = pendingDisplayUpdateRef.current;
+    pendingDisplayUpdateRef.current = null;
+    if (pending === null) {
+      return;
+    }
+    if (pending.updateSource) {
+      setSource(pending.formatted);
+    }
+    setHistory((items) => [...items, pending.formatted]);
+  }, []);
 
   useEffect(() => {
     if (!isPlaying) {
@@ -98,7 +136,7 @@ export function App(): React.JSX.Element {
     }
 
     const delay = animateSubstitutions ?
-      Math.max(animationDuration + 80, 140) : 16;
+      Math.max(animationDuration + 180, 240) : 16;
     const timeout = window.setTimeout(() => applyReduction(), delay);
     return () => window.clearTimeout(timeout);
   }, [
@@ -116,6 +154,7 @@ export function App(): React.JSX.Element {
     const normalizedValue = value.replaceAll('\\', 'λ');
     setSource(normalizedValue);
     setIsPlaying(false);
+    pendingDisplayUpdateRef.current = null;
 
     try {
       const parsedTerm = parseSource(normalizedValue);
@@ -169,6 +208,7 @@ export function App(): React.JSX.Element {
     setStepCount(0);
     setError(null);
     setIsPlaying(false);
+    pendingDisplayUpdateRef.current = null;
   }
 
   function downloadDiagram(): void {
@@ -273,6 +313,8 @@ export function App(): React.JSX.Element {
             <div className="canvas-wrap">
               <LambdaCanvas
                 animationDuration={animationDuration}
+                animationStep={stepCount}
+                onAnimationStateChange={handleAnimationStateChange}
                 term={term}
               />
               <button
@@ -294,8 +336,12 @@ export function App(): React.JSX.Element {
                 <FullscreenIcon />
               </button>
               <div className="canvas-status">
-                <span className={`status-dot ${isPlaying ? 'active' : ''}`} />
-                <span>{isPlaying ? 'Reducing' : isReducible ? 'Ready' : 'Normal form'}</span>
+                <span className={`status-dot ${isPlaying || isAnimating ? 'active' : ''}`} />
+                <span>
+                  {isAnimating ? 'Animating substitution' :
+                    isPlaying ? 'Reducing' :
+                      isReducible ? 'Ready' : 'Normal form'}
+                </span>
                 <span>β {stepCount}</span>
               </div>
             </div>
@@ -323,7 +369,7 @@ export function App(): React.JSX.Element {
 
             <div className="action-section primary-actions">
               <button
-                disabled={error !== null || !isReducible || isPlaying}
+                disabled={error !== null || !isReducible || isPlaying || isAnimating}
                 onClick={() => setIsPlaying(true)}
                 type="button"
               >
@@ -354,7 +400,7 @@ export function App(): React.JSX.Element {
 
             <div className="action-section secondary-actions">
               <button
-                disabled={error !== null || !isReducible || isPlaying}
+                disabled={error !== null || !isReducible || isPlaying || isAnimating}
                 onClick={applyReduction}
                 type="button"
               >
@@ -393,7 +439,9 @@ export function App(): React.JSX.Element {
             <p>
               A horizontal line introduces a lambda. Every vertical line below
               it traces an occurrence of the bound variable. Applications join
-              a function on the left to its argument on the right.
+              a function on the left to its argument on the right. During a
+              reduction, red marks the active β-redex, cyan marks the argument,
+              and yellow marks every occurrence that will be replaced.
             </p>
           </div>
         </section>

@@ -2,6 +2,7 @@ import type {LambdaTerm} from '../core/ast';
 
 export interface DiagramLine {
   readonly key: string;
+  readonly motionKey: string;
   readonly x1: number;
   readonly y1: number;
   readonly x2: number;
@@ -12,6 +13,7 @@ export interface DiagramLine {
 
 export interface DiagramLabel {
   readonly key: string;
+  readonly motionKey: string;
   readonly x: number;
   readonly y: number;
   readonly text: string;
@@ -107,6 +109,7 @@ function place(
 
     context.lines.push({
       key: `${term.id}:variable`,
+      motionKey: `${visualId(term)}:variable`,
       x1: outputX,
       y1: binder?.y ?? y + 0.24,
       x2: outputX,
@@ -116,6 +119,7 @@ function place(
     });
     context.labels.push({
       key: `${term.id}:label`,
+      motionKey: `${visualId(term)}:label`,
       x: outputX,
       y: outputY + 0.14,
       text: term.name,
@@ -127,13 +131,14 @@ function place(
   if (term.kind === 'abstraction') {
     const bodySize = measure(term.body);
     const bodyX = x + (size.width - bodySize.width) / 2;
-    const color = colorForId(term.id);
+    const color = colorForId(visualId(term));
     const barY = y + 0.34;
     const nextBinders = new Map(binders);
     nextBinders.set(term.parameter, {color, id: term.id, y: barY});
 
     context.lines.push({
       key: `${term.id}:abstraction`,
+      motionKey: `${visualId(term)}:abstraction`,
       x1: x + 0.1,
       y1: barY,
       x2: x + size.width - 0.1,
@@ -143,6 +148,7 @@ function place(
     });
     context.labels.push({
       key: `${term.id}:parameter`,
+      motionKey: `${visualId(term)}:parameter`,
       x: x + 0.1,
       y: barY - 0.18,
       text: `λ${term.parameter}`,
@@ -188,6 +194,7 @@ function place(
   context.lines.push(
     {
       key: `${term.id}:function-connector`,
+      motionKey: `${visualId(term)}:function-connector`,
       x1: functionPlacement.outputX,
       y1: functionPlacement.outputY,
       x2: functionPlacement.outputX,
@@ -197,6 +204,7 @@ function place(
     },
     {
       key: `${term.id}:argument-connector`,
+      motionKey: `${visualId(term)}:argument-connector`,
       x1: argumentPlacement.outputX,
       y1: argumentPlacement.outputY,
       x2: argumentPlacement.outputX,
@@ -206,6 +214,7 @@ function place(
     },
     {
       key: `${term.id}:application`,
+      motionKey: `${visualId(term)}:application`,
       x1: functionPlacement.outputX,
       y1: barY,
       x2: argumentPlacement.outputX,
@@ -215,6 +224,7 @@ function place(
     },
     {
       key: `${term.id}:output`,
+      motionKey: `${visualId(term)}:output`,
       x1: functionPlacement.outputX,
       y1: barY,
       x2: functionPlacement.outputX,
@@ -229,12 +239,16 @@ function place(
 
 function colorForTerm(term: LambdaTerm): string {
   if (term.kind === 'abstraction') {
-    return colorForId(term.id);
+    return colorForId(visualId(term));
   }
   if (term.kind === 'variable') {
     return 'var(--diagram-free)';
   }
   return mixColors(colorForTerm(term.functionTerm), colorForTerm(term.argument));
+}
+
+function visualId(term: LambdaTerm): string {
+  return term.originId ?? term.id;
 }
 
 function colorForId(id: string): string {

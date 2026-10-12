@@ -11,6 +11,41 @@ export interface ReductionResult {
   readonly term: LambdaTerm;
 }
 
+export interface ReductionFocus {
+  readonly argumentIds: ReadonlySet<string>;
+  readonly occurrenceIds: ReadonlySet<string>;
+  readonly parameter: string;
+  readonly redexIds: ReadonlySet<string>;
+}
+
+export function findNextReduction(term: LambdaTerm): ReductionFocus | null {
+  if (term.kind === 'variable') {
+    return null;
+  }
+
+  if (term.kind === 'abstraction') {
+    return findNextReduction(term.body);
+  }
+
+  if (term.functionTerm.kind === 'abstraction') {
+    return {
+      argumentIds: collectTermIds(term.argument),
+      occurrenceIds: collectSubstitutionTargets(
+        term.functionTerm.body,
+        term.functionTerm.parameter,
+      ),
+      parameter: term.functionTerm.parameter,
+      redexIds: new Set([
+        term.id,
+        ...collectTermIds(term.functionTerm),
+      ]),
+    };
+  }
+
+  return findNextReduction(term.functionTerm) ??
+    findNextReduction(term.argument);
+}
+
 export function reduceOnce(term: LambdaTerm): ReductionResult {
   if (term.kind === 'application') {
     if (term.functionTerm.kind === 'abstraction') {
@@ -211,4 +246,39 @@ function findFreshVariable(usedVariables: ReadonlySet<string>): string {
     suffix += 1;
   }
   return `v${suffix}`;
+}
+
+function collectTermIds(term: LambdaTerm): ReadonlySet<string> {
+  if (term.kind === 'variable') {
+    return new Set([term.id]);
+  }
+
+  if (term.kind === 'abstraction') {
+    return new Set([term.id, ...collectTermIds(term.body)]);
+  }
+
+  return new Set([
+    term.id,
+    ...collectTermIds(term.functionTerm),
+    ...collectTermIds(term.argument),
+  ]);
+}
+
+function collectSubstitutionTargets(
+  term: LambdaTerm,
+  parameter: string,
+): ReadonlySet<string> {
+  if (term.kind === 'variable') {
+    return term.name === parameter ? new Set([term.id]) : new Set();
+  }
+
+  if (term.kind === 'abstraction') {
+    return term.parameter === parameter ?
+      new Set() : collectSubstitutionTargets(term.body, parameter);
+  }
+
+  return new Set([
+    ...collectSubstitutionTargets(term.functionTerm, parameter),
+    ...collectSubstitutionTargets(term.argument, parameter),
+  ]);
 }
