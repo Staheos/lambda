@@ -1,7 +1,10 @@
 import {describe, expect, it} from 'vitest';
 import {parseLambda} from './parser';
-import {formatLambda, reduceOnce} from './reducer';
-import {expandLambdaShorthands} from './shorthands';
+import {canReduce, formatLambda, reduceOnce} from './reducer';
+import {
+  expandLambdaShorthands,
+  formatWithLambdaShorthands,
+} from './shorthands';
 
 describe('expandLambdaShorthands', () => {
   it('expands the identity combinator', () => {
@@ -14,7 +17,37 @@ describe('expandLambdaShorthands', () => {
     expect(formatLambda(parseLambda(expanded))).toBe('λfx.f (f x)');
   });
 
+  it('expands multi-digit Church numerals as one value', () => {
+    const expanded = expandLambdaShorthands('12');
+    expect(formatWithLambdaShorthands(parseLambda(expanded))).toBe('12');
+  });
+
+  it('expands subtraction', () => {
+    let term = parseLambda(expandLambdaShorthands('- 3 1'));
+    for (let step = 0; step < 100 && canReduce(term); step += 1) {
+      term = reduceOnce(term).term;
+    }
+    expect(formatWithLambdaShorthands(term)).toBe('2');
+  });
+
   it('leaves ordinary variables unchanged', () => {
     expect(expandLambdaShorthands('λx.x')).toBe('λx.x');
+  });
+});
+
+describe('formatWithLambdaShorthands', () => {
+  it('recognizes Church numerals regardless of parameter names', () => {
+    const term = parseLambda('λab.a (a (a (a b)))');
+    expect(formatWithLambdaShorthands(term)).toBe('4');
+  });
+
+  it('recognizes operators inside applications', () => {
+    const term = parseLambda(expandLambdaShorthands('+ 2 3'));
+    expect(formatWithLambdaShorthands(term)).toBe('+ 2 3');
+  });
+
+  it('does not collapse a similar but different expression', () => {
+    const term = parseLambda('λf.λx.f (x f)');
+    expect(formatWithLambdaShorthands(term)).toBe('λfx.f (x f)');
   });
 });

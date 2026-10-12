@@ -2,7 +2,10 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import type {LambdaTerm} from '../core/ast';
 import {LambdaSyntaxError, parseLambda} from '../core/parser';
 import {canReduce, formatLambda, reduceOnce} from '../core/reducer';
-import {expandLambdaShorthands} from '../core/shorthands';
+import {
+  expandLambdaShorthands,
+  formatWithLambdaShorthands,
+} from '../core/shorthands';
 import {LambdaCanvas} from './LambdaCanvas';
 
 interface Example {
@@ -23,6 +26,7 @@ const EXAMPLES: readonly Example[] = [
   {label: 'Boolean true', expression: 'T a b'},
   {label: 'Successor', expression: '> 2'},
   {label: 'Addition', expression: '+ 2 3'},
+  {label: 'Subtraction', expression: '- 5 2'},
   {label: 'Multiplication', expression: '* 2 3'},
   {label: 'Exponentiation', expression: '^ 2 3'},
   {label: 'Omega', expression: '(λx.x x) (λx.x x)'},
@@ -33,6 +37,15 @@ const MAX_AUTOMATIC_STEPS = 250;
 
 function parseSource(source: string): LambdaTerm {
   return parseLambda(expandLambdaShorthands(source));
+}
+
+function formatForDisplay(
+  term: LambdaTerm,
+  collapseShorthands: boolean,
+): string {
+  return collapseShorthands ?
+    formatWithLambdaShorthands(term) :
+    formatLambda(term);
 }
 
 export function App(): React.JSX.Element {
@@ -46,6 +59,7 @@ export function App(): React.JSX.Element {
   const [speed, setSpeed] = useState(1);
   const [stepCount, setStepCount] = useState(0);
   const [expandShorthands, setExpandShorthands] = useState(false);
+  const [collapseShorthands, setCollapseShorthands] = useState(false);
   const [animateSubstitutions, setAnimateSubstitutions] = useState(true);
   const [updateExpression, setUpdateExpression] = useState(true);
   const isReducible = useMemo(() => canReduce(term), [term]);
@@ -54,12 +68,12 @@ export function App(): React.JSX.Element {
   const applyReduction = useCallback((): boolean => {
     const result = reduceOnce(term);
     if (!result.changed) {
-      setSource(formatLambda(term));
+      setSource(formatForDisplay(term, collapseShorthands));
       setIsPlaying(false);
       return false;
     }
 
-    const formatted = formatLambda(result.term);
+    const formatted = formatForDisplay(result.term, collapseShorthands);
     setTerm(result.term);
     if (updateExpression || !isPlaying) {
       setSource(formatted);
@@ -67,7 +81,7 @@ export function App(): React.JSX.Element {
     setHistory((items) => [...items, formatted]);
     setStepCount((count) => count + 1);
     return true;
-  }, [isPlaying, term, updateExpression]);
+  }, [collapseShorthands, isPlaying, term, updateExpression]);
 
   useEffect(() => {
     if (!isPlaying) {
@@ -75,7 +89,7 @@ export function App(): React.JSX.Element {
     }
 
     if (!isReducible || stepCount >= MAX_AUTOMATIC_STEPS) {
-      setSource(formatLambda(term));
+      setSource(formatForDisplay(term, collapseShorthands));
       setIsPlaying(false);
       return;
     }
@@ -85,7 +99,15 @@ export function App(): React.JSX.Element {
       Math.max(animationDuration + 80, 140),
     );
     return () => window.clearTimeout(timeout);
-  }, [animationDuration, applyReduction, isPlaying, isReducible, stepCount, term]);
+  }, [
+    animationDuration,
+    applyReduction,
+    collapseShorthands,
+    isPlaying,
+    isReducible,
+    stepCount,
+    term,
+  ]);
 
   function handleSourceChange(value: string): void {
     const normalizedValue = value.replaceAll('\\', 'λ');
@@ -94,10 +116,14 @@ export function App(): React.JSX.Element {
 
     try {
       const parsedTerm = parseSource(normalizedValue);
+      const visibleValue = collapseShorthands ?
+        formatWithLambdaShorthands(parsedTerm) :
+        expandShorthands ? formatLambda(parsedTerm) : normalizedValue;
+      setSource(visibleValue);
       setTerm(parsedTerm);
       setInitialTerm(parsedTerm);
       setInitialSource(normalizedValue);
-      setHistory([formatLambda(parsedTerm)]);
+      setHistory([formatForDisplay(parsedTerm, collapseShorthands)]);
       setStepCount(0);
       setError(null);
     } catch (caughtError) {
@@ -114,14 +140,29 @@ export function App(): React.JSX.Element {
   function toggleShorthandExpansion(checked: boolean): void {
     setExpandShorthands(checked);
     if (checked) {
-      handleSourceChange(expandLambdaShorthands(source));
+      setCollapseShorthands(false);
+      setSource(formatLambda(term));
+    }
+  }
+
+  function toggleShorthandCollapse(checked: boolean): void {
+    setCollapseShorthands(checked);
+    if (checked) {
+      setExpandShorthands(false);
+      setSource(formatWithLambdaShorthands(term));
+    } else {
+      setSource(formatLambda(term));
     }
   }
 
   function reset(): void {
     setTerm(initialTerm);
-    setSource(initialSource);
-    setHistory([formatLambda(initialTerm)]);
+    setSource(
+      collapseShorthands ?
+        formatWithLambdaShorthands(initialTerm) :
+        expandShorthands ? formatLambda(initialTerm) : initialSource,
+    );
+    setHistory([formatForDisplay(initialTerm, collapseShorthands)]);
     setStepCount(0);
     setError(null);
     setIsPlaying(false);
@@ -207,6 +248,11 @@ export function App(): React.JSX.Element {
               checked={expandShorthands}
               label="Expand shorthands"
               onChange={toggleShorthandExpansion}
+            />
+            <OptionToggle
+              checked={collapseShorthands}
+              label="Collapse recognized expressions"
+              onChange={toggleShorthandCollapse}
             />
             <OptionToggle
               checked={animateSubstitutions}
