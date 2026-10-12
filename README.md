@@ -6,8 +6,11 @@ An interactive lambda calculus visualizer with animated beta reduction.
 
 Function application is written by juxtaposition, so addition is `+ 2 3`
 rather than `2 + 3`. The input supports Church numerals and the shorthand
-operators `+`, `-`, `*`, `^`, `^^` (displayed as `↑↑`), `>`, and `!`, together
-with the combinators `T`, `F`, `I`, `K`, and `S`.
+operators `+`, `-`, `*`, `/`, `^`, `^^` (displayed as `↑↑`), `>`, and `!`,
+together with the combinators `T`, `F`, `I`, `K`, and `S`. Division is integer
+division on Church numerals: `/ 7 2` reduces to `3`. Division by zero reduces
+to the zero/false Church term, displayed as `F` by the configured boolean
+priority.
 
 The **Collapse recognized expressions** option formats exact, structurally
 equivalent lambda terms back into known semantic notation. Recognition runs

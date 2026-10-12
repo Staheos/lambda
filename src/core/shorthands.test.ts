@@ -31,6 +31,22 @@ describe('expandLambdaShorthands', () => {
     expect(formatWithLambdaShorthands(term)).toBe('2');
   });
 
+  it.each([
+    ['7', '2', '3'],
+    ['8', '2', '4'],
+    ['3', '5', 'F'],
+    ['5', '0', 'F'],
+  ])('divides %s by %s', (dividend, divisor, quotient) => {
+    let term = parseLambda(
+      expandLambdaShorthands(`/ ${dividend} ${divisor}`),
+    );
+    for (let step = 0; step < 1_000 && canReduce(term); step += 1) {
+      term = reduceOnce(term).term;
+    }
+    expect(canReduce(term)).toBe(false);
+    expect(formatWithLambdaShorthands(term)).toBe(quotient);
+  });
+
   it('leaves ordinary variables unchanged', () => {
     expect(expandLambdaShorthands('λx.x')).toBe('λx.x');
   });

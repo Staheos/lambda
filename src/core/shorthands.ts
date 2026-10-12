@@ -5,6 +5,21 @@ import {canReduce, formatLambda, reduceOnce} from './reducer';
 const PREDECESSOR =
   '(λn.λf.λx.n (λg.λh.h (g f)) (λu.x) (λu.u))';
 const TETRATION = '(λm.λn.n (λe.e m) (λf.λx.f x))';
+const ZERO = '(λf.λx.x)';
+const TRUE = '(λt.λf.t)';
+const FALSE = '(λt.λf.f)';
+const SUCCESSOR = '(λn.λf.λx.f (n f x))';
+const SUBTRACTION = `(λm.λn.n ${PREDECESSOR} m)`;
+const IS_ZERO = `(λn.n (λx.${FALSE}) ${TRUE})`;
+const LESS_OR_EQUAL =
+  `(λm.λn.${IS_ZERO} (${SUBTRACTION} m n))`;
+const FIX = '(λg.(λx.g (x x)) (λx.g (x x)))';
+const DIVISION_BODY =
+  `(λr.λn.λd.${LESS_OR_EQUAL} d n ` +
+  `(${SUCCESSOR} (r (${SUBTRACTION} n d) d)) ${ZERO})`;
+const DIVISION =
+  `(λn.λd.${IS_ZERO} d ${ZERO} ` +
+  `(${FIX} ${DIVISION_BODY} n d))`;
 
 const SHORTHANDS: Readonly<Record<string, string>> = {
   '↑↑': TETRATION,
@@ -18,12 +33,14 @@ const SHORTHANDS: Readonly<Record<string, string>> = {
   '+': '(λm.λn.λf.λx.m f (n f x))',
   '-': `(λm.λn.n ${PREDECESSOR} m)`,
   '*': '(λm.λn.λf.m (n f))',
+  '/': DIVISION,
   '^': '(λb.λe.e b)',
   '>': '(λn.λf.λx.f (n f x))',
 };
 
 interface KnownExpression {
   readonly display: string;
+  readonly normalize?: boolean;
   readonly source: string;
 }
 
@@ -31,6 +48,7 @@ const KNOWN_EXPRESSIONS: readonly KnownExpression[] = [
   {display: '+', source: '+'},
   {display: '-', source: '-'},
   {display: '*', source: '*'},
+  {display: '/', normalize: false, source: '/'},
   {display: '^', source: '^'},
   {display: '↑↑', source: '^^'},
   {display: '>', source: '>'},
@@ -119,7 +137,9 @@ function buildKnownSignatures(): ReadonlyMap<string, string> {
   for (const expression of KNOWN_EXPRESSIONS) {
     const term = parseLambda(expandLambdaShorthands(expression.source));
     signatures.set(alphaSignature(term), expression.display);
-    signatures.set(alphaSignature(normalize(term)), expression.display);
+    if (expression.normalize !== false) {
+      signatures.set(alphaSignature(normalize(term)), expression.display);
+    }
   }
 
   return signatures;

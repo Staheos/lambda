@@ -28,6 +28,7 @@ const EXAMPLES: readonly Example[] = [
   {label: 'Addition', expression: '+ 2 3'},
   {label: 'Subtraction', expression: '- 5 2'},
   {label: 'Multiplication', expression: '* 2 3'},
+  {label: 'Integer division', expression: '/ 7 2'},
   {label: 'Exponentiation', expression: '^ 2 3'},
   {label: 'Tetration', expression: '^^ 2 3'},
   {label: 'Higher-order operators', expression: '*++'},
@@ -35,7 +36,7 @@ const EXAMPLES: readonly Example[] = [
 ];
 
 const INITIAL_EXPRESSION = '* 2 3';
-const MAX_AUTOMATIC_STEPS = 250;
+const MAX_AUTOMATIC_STEPS = 1_000;
 
 function parseSource(source: string): LambdaTerm {
   return parseLambda(expandLambdaShorthands(source));
@@ -96,13 +97,13 @@ export function App(): React.JSX.Element {
       return;
     }
 
-    const timeout = window.setTimeout(
-      () => applyReduction(),
-      Math.max(animationDuration + 80, 140),
-    );
+    const delay = animateSubstitutions ?
+      Math.max(animationDuration + 80, 140) : 16;
+    const timeout = window.setTimeout(() => applyReduction(), delay);
     return () => window.clearTimeout(timeout);
   }, [
     animationDuration,
+    animateSubstitutions,
     applyReduction,
     collapseShorthands,
     isPlaying,
@@ -118,7 +119,7 @@ export function App(): React.JSX.Element {
 
     try {
       const parsedTerm = parseSource(normalizedValue);
-      const visibleValue = collapseShorthands ?
+      const visibleValue = collapseShorthands && !canReduce(parsedTerm) ?
         formatWithRecognizedNormalForms(parsedTerm) :
         expandShorthands ? formatLambda(parsedTerm) : normalizedValue;
       setSource(visibleValue);
@@ -151,7 +152,7 @@ export function App(): React.JSX.Element {
     setCollapseShorthands(checked);
     if (checked) {
       setExpandShorthands(false);
-      setSource(formatForDisplay(term, true));
+      setSource(canReduce(term) ? source : formatWithRecognizedNormalForms(term));
     } else {
       setSource(formatLambda(term));
     }
@@ -160,7 +161,7 @@ export function App(): React.JSX.Element {
   function reset(): void {
     setTerm(initialTerm);
     setSource(
-      collapseShorthands ?
+      collapseShorthands && !canReduce(initialTerm) ?
         formatWithRecognizedNormalForms(initialTerm) :
         expandShorthands ? formatLambda(initialTerm) : initialSource,
     );
