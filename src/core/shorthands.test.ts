@@ -46,6 +46,21 @@ describe('formatWithLambdaShorthands', () => {
     expect(formatWithLambdaShorthands(term)).toBe('+ 2 3');
   });
 
+  it.each(['+++', '+*+'])('compacts the operator chain %s', (source) => {
+    const term = parseLambda(expandLambdaShorthands(source));
+    expect(formatWithLambdaShorthands(term)).toBe(source);
+  });
+
+  it('preserves parentheses around an operator chain used as an argument', () => {
+    const term = parseLambda(expandLambdaShorthands('+ (+*+)'));
+    expect(formatWithLambdaShorthands(term)).toBe('+ (+*+)');
+  });
+
+  it('prefers conventional Church booleans for ambiguous terms', () => {
+    expect(formatWithLambdaShorthands(parseLambda('λxy.x'))).toBe('T');
+    expect(formatWithLambdaShorthands(parseLambda('λxy.y'))).toBe('F');
+  });
+
   it('does not collapse a similar but different expression', () => {
     const term = parseLambda('λf.λx.f (x f)');
     expect(formatWithLambdaShorthands(term)).toBe('λfx.f (x f)');

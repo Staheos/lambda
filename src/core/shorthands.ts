@@ -31,6 +31,7 @@ const COLLAPSE_ORDER = [
   'I',
   'S',
 ];
+const COMPACT_OPERATORS = new Set(['+', '-', '*', '^', '>', '!']);
 const SHORTHAND_SIGNATURES = new Map(
   COLLAPSE_ORDER.map((symbol) => [
     alphaSignature(parseLambda(SHORTHANDS[symbol])),
@@ -65,6 +66,11 @@ export function formatWithLambdaShorthands(term: LambdaTerm): string {
 }
 
 function formatTerm(term: LambdaTerm, parentPrecedence: number): string {
+  const operatorChain = identifyOperatorChain(term);
+  if (operatorChain !== null) {
+    return parentPrecedence > 1 ? `(${operatorChain})` : operatorChain;
+  }
+
   const shorthand = identifyShorthand(term);
   if (shorthand !== null) {
     return shorthand;
@@ -92,12 +98,42 @@ function formatTerm(term: LambdaTerm, parentPrecedence: number): string {
 }
 
 function identifyShorthand(term: LambdaTerm): string | null {
+  const shorthand = SHORTHAND_SIGNATURES.get(alphaSignature(term));
+  if (shorthand !== undefined) {
+    return shorthand;
+  }
+
   const numeral = identifyChurchNumeral(term);
   if (numeral !== null) {
     return String(numeral);
   }
 
-  return SHORTHAND_SIGNATURES.get(alphaSignature(term)) ?? null;
+  return null;
+}
+
+function identifyOperatorChain(term: LambdaTerm): string | null {
+  if (term.kind !== 'application') {
+    return null;
+  }
+
+  const terms = flattenApplication(term);
+  const symbols = terms.map(identifyShorthand);
+  if (symbols.every(
+    (symbol): symbol is string =>
+      symbol !== null && COMPACT_OPERATORS.has(symbol),
+  )) {
+    return symbols.join('');
+  }
+
+  return null;
+}
+
+function flattenApplication(term: LambdaTerm): readonly LambdaTerm[] {
+  if (term.kind !== 'application') {
+    return [term];
+  }
+
+  return [...flattenApplication(term.functionTerm), term.argument];
 }
 
 function identifyChurchNumeral(term: LambdaTerm): number | null {

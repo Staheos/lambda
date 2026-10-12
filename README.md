@@ -12,7 +12,10 @@ operators `+`, `-`, `*`, `^`, `>`, and `!`, together with the combinators
 The **Collapse recognized expressions** option formats exact, structurally
 equivalent lambda terms back into their shortest known notation. Recognition
 is alpha-equivalence aware, so `λa.λb.a (a b)` is displayed as `2` even though
-its parameter names differ from the canonical definition.
+its parameter names differ from the canonical definition. Operator-only
+application chains are compacted, for example `+ + +` becomes `+++` and
+`+ * +` becomes `+*+`. Ambiguous terms follow the established Church boolean
+convention: `λxy.x` is displayed as `T` and `λxy.y` as `F`.
 
 ## Development
 
