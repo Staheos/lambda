@@ -4,7 +4,7 @@ import {LambdaSyntaxError, parseLambda} from '../core/parser';
 import {canReduce, formatLambda, reduceOnce} from '../core/reducer';
 import {
   expandLambdaShorthands,
-  formatWithLambdaShorthands,
+  formatWithRecognizedNormalForms,
 } from '../core/shorthands';
 import {LambdaCanvas} from './LambdaCanvas';
 
@@ -29,6 +29,8 @@ const EXAMPLES: readonly Example[] = [
   {label: 'Subtraction', expression: '- 5 2'},
   {label: 'Multiplication', expression: '* 2 3'},
   {label: 'Exponentiation', expression: '^ 2 3'},
+  {label: 'Tetration', expression: '^^ 2 3'},
+  {label: 'Higher-order operators', expression: '*++'},
   {label: 'Omega', expression: '(λx.x x) (λx.x x)'},
 ];
 
@@ -44,7 +46,7 @@ function formatForDisplay(
   collapseShorthands: boolean,
 ): string {
   return collapseShorthands ?
-    formatWithLambdaShorthands(term) :
+    formatWithRecognizedNormalForms(term) :
     formatLambda(term);
 }
 
@@ -117,7 +119,7 @@ export function App(): React.JSX.Element {
     try {
       const parsedTerm = parseSource(normalizedValue);
       const visibleValue = collapseShorthands ?
-        formatWithLambdaShorthands(parsedTerm) :
+        formatWithRecognizedNormalForms(parsedTerm) :
         expandShorthands ? formatLambda(parsedTerm) : normalizedValue;
       setSource(visibleValue);
       setTerm(parsedTerm);
@@ -149,7 +151,7 @@ export function App(): React.JSX.Element {
     setCollapseShorthands(checked);
     if (checked) {
       setExpandShorthands(false);
-      setSource(formatWithLambdaShorthands(term));
+      setSource(formatForDisplay(term, true));
     } else {
       setSource(formatLambda(term));
     }
@@ -159,7 +161,7 @@ export function App(): React.JSX.Element {
     setTerm(initialTerm);
     setSource(
       collapseShorthands ?
-        formatWithLambdaShorthands(initialTerm) :
+        formatWithRecognizedNormalForms(initialTerm) :
         expandShorthands ? formatLambda(initialTerm) : initialSource,
     );
     setHistory([formatForDisplay(initialTerm, collapseShorthands)]);
@@ -251,7 +253,7 @@ export function App(): React.JSX.Element {
             />
             <OptionToggle
               checked={collapseShorthands}
-              label="Collapse recognized expressions"
+                label="Collapse recognized normal forms"
               onChange={toggleShorthandCollapse}
             />
             <OptionToggle

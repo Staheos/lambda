@@ -1,10 +1,14 @@
 import type {LambdaTerm} from './ast';
 import {parseLambda} from './parser';
+import {canReduce, formatLambda, reduceOnce} from './reducer';
 
 const PREDECESSOR =
   '(λn.λf.λx.n (λg.λh.h (g f)) (λu.x) (λu.u))';
+const TETRATION = '(λm.λn.n (λe.e m) (λf.λx.f x))';
 
 const SHORTHANDS: Readonly<Record<string, string>> = {
+  '↑↑': TETRATION,
+  '^^': TETRATION,
   T: '(λt.λf.t)',
   F: '(λt.λf.f)',
   I: '(λx.x)',
@@ -18,26 +22,30 @@ const SHORTHANDS: Readonly<Record<string, string>> = {
   '>': '(λn.λf.λx.f (n f x))',
 };
 
-const COLLAPSE_ORDER = [
-  '+',
-  '-',
-  '*',
-  '^',
-  '>',
-  '!',
-  'K',
-  'T',
-  'F',
-  'I',
-  'S',
+interface KnownExpression {
+  readonly display: string;
+  readonly source: string;
+}
+
+const KNOWN_EXPRESSIONS: readonly KnownExpression[] = [
+  {display: '+', source: '+'},
+  {display: '-', source: '-'},
+  {display: '*', source: '*'},
+  {display: '^', source: '^'},
+  {display: '↑↑', source: '^^'},
+  {display: '>', source: '>'},
+  {display: '!', source: '!'},
+  {display: 'K', source: 'K'},
+  {display: 'T', source: 'T'},
+  {display: 'F', source: 'F'},
+  {display: 'I', source: 'I'},
+  {display: 'S', source: 'S'},
 ];
-const COMPACT_OPERATORS = new Set(['+', '-', '*', '^', '>', '!']);
-const SHORTHAND_SIGNATURES = new Map(
-  COLLAPSE_ORDER.map((symbol) => [
-    alphaSignature(parseLambda(SHORTHANDS[symbol])),
-    symbol,
-  ]),
+
+const SHORTHAND_TOKENS = Object.keys(SHORTHANDS).sort(
+  (left, right) => right.length - left.length,
 );
+const SHORTHAND_SIGNATURES = buildKnownSignatures();
 
 export function expandLambdaShorthands(source: string): string {
   let result = '';
@@ -54,7 +62,16 @@ export function expandLambdaShorthands(source: string): string {
       continue;
     }
 
-    result += SHORTHANDS[character] ?? character;
+    const shorthand = SHORTHAND_TOKENS.find(
+      (token) => source.startsWith(token, index),
+    );
+    if (shorthand !== undefined) {
+      result += SHORTHANDS[shorthand];
+      index += shorthand.length;
+      continue;
+    }
+
+    result += character;
     index += 1;
   }
 
@@ -65,12 +82,11 @@ export function formatWithLambdaShorthands(term: LambdaTerm): string {
   return formatTerm(term, 0);
 }
 
-function formatTerm(term: LambdaTerm, parentPrecedence: number): string {
-  const operatorChain = identifyOperatorChain(term);
-  if (operatorChain !== null) {
-    return parentPrecedence > 1 ? `(${operatorChain})` : operatorChain;
-  }
+export function formatWithRecognizedNormalForms(term: LambdaTerm): string {
+  return canReduce(term) ? formatLambda(term) : formatWithLambdaShorthands(term);
+}
 
+function formatTerm(term: LambdaTerm, parentPrecedence: number): string {
   const shorthand = identifyShorthand(term);
   if (shorthand !== null) {
     return shorthand;
@@ -97,6 +113,29 @@ function formatTerm(term: LambdaTerm, parentPrecedence: number): string {
   return parentPrecedence > 1 ? `(${result})` : result;
 }
 
+function buildKnownSignatures(): ReadonlyMap<string, string> {
+  const signatures = new Map<string, string>();
+
+  for (const expression of KNOWN_EXPRESSIONS) {
+    const term = parseLambda(expandLambdaShorthands(expression.source));
+    signatures.set(alphaSignature(term), expression.display);
+    signatures.set(alphaSignature(normalize(term)), expression.display);
+  }
+
+  return signatures;
+}
+
+function normalize(term: LambdaTerm): LambdaTerm {
+  let current = term;
+  const maximumSteps = 2_000;
+
+  for (let step = 0; step < maximumSteps && canReduce(current); step += 1) {
+    current = reduceOnce(current).term;
+  }
+
+  return current;
+}
+
 function identifyShorthand(term: LambdaTerm): string | null {
   const shorthand = SHORTHAND_SIGNATURES.get(alphaSignature(term));
   if (shorthand !== undefined) {
@@ -109,31 +148,6 @@ function identifyShorthand(term: LambdaTerm): string | null {
   }
 
   return null;
-}
-
-function identifyOperatorChain(term: LambdaTerm): string | null {
-  if (term.kind !== 'application') {
-    return null;
-  }
-
-  const terms = flattenApplication(term);
-  const symbols = terms.map(identifyShorthand);
-  if (symbols.every(
-    (symbol): symbol is string =>
-      symbol !== null && COMPACT_OPERATORS.has(symbol),
-  )) {
-    return symbols.join('');
-  }
-
-  return null;
-}
-
-function flattenApplication(term: LambdaTerm): readonly LambdaTerm[] {
-  if (term.kind !== 'application') {
-    return [term];
-  }
-
-  return [...flattenApplication(term.functionTerm), term.argument];
 }
 
 function identifyChurchNumeral(term: LambdaTerm): number | null {

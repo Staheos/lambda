@@ -4,6 +4,7 @@ import {canReduce, formatLambda, reduceOnce} from './reducer';
 import {
   expandLambdaShorthands,
   formatWithLambdaShorthands,
+  formatWithRecognizedNormalForms,
 } from './shorthands';
 
 describe('expandLambdaShorthands', () => {
@@ -46,14 +47,22 @@ describe('formatWithLambdaShorthands', () => {
     expect(formatWithLambdaShorthands(term)).toBe('+ 2 3');
   });
 
-  it.each(['+++', '+*+'])('compacts the operator chain %s', (source) => {
-    const term = parseLambda(expandLambdaShorthands(source));
-    expect(formatWithLambdaShorthands(term)).toBe(source);
+  it('does not reconstruct an operator chain from its input', () => {
+    const term = parseLambda(expandLambdaShorthands('*++'));
+    expect(formatWithLambdaShorthands(term)).toBe('* + +');
   });
 
-  it('preserves parentheses around an operator chain used as an argument', () => {
-    const term = parseLambda(expandLambdaShorthands('+ (+*+)'));
-    expect(formatWithLambdaShorthands(term)).toBe('+ (+*+)');
+  it('recognizes conventional tetration notation', () => {
+    const term = parseLambda(expandLambdaShorthands('^^'));
+    expect(formatWithLambdaShorthands(term)).toBe('↑↑');
+  });
+
+  it('evaluates a power tower of two with height three', () => {
+    let term = parseLambda(expandLambdaShorthands('^^ 2 3'));
+    for (let step = 0; step < 2_000 && canReduce(term); step += 1) {
+      term = reduceOnce(term).term;
+    }
+    expect(formatWithLambdaShorthands(term)).toBe('16');
   });
 
   it('prefers conventional Church booleans for ambiguous terms', () => {
@@ -64,5 +73,22 @@ describe('formatWithLambdaShorthands', () => {
   it('does not collapse a similar but different expression', () => {
     const term = parseLambda('λf.λx.f (x f)');
     expect(formatWithLambdaShorthands(term)).toBe('λfx.f (x f)');
+  });
+});
+
+describe('formatWithRecognizedNormalForms', () => {
+  it('keeps reducible expressions fully expanded', () => {
+    const term = parseLambda(expandLambdaShorthands('*++'));
+    expect(formatWithRecognizedNormalForms(term)).toBe(formatLambda(term));
+  });
+
+  it('collapses only after reaching a normal form', () => {
+    let term = parseLambda(expandLambdaShorthands('+ 2 3'));
+    expect(formatWithRecognizedNormalForms(term)).toBe(formatLambda(term));
+
+    for (let step = 0; step < 2_000 && canReduce(term); step += 1) {
+      term = reduceOnce(term).term;
+    }
+    expect(formatWithRecognizedNormalForms(term)).toBe('5');
   });
 });
