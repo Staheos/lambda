@@ -113,7 +113,7 @@ export class CanvasRenderer {
       y1: transform.y(line.y1),
       x2: transform.x(line.x2),
       y2: transform.y(line.y2),
-      width: Math.max(line.width * transform.scale, 2.5),
+      width: Math.max(line.width * transform.scale * 0.32, 1.5),
       alpha: 1,
     }));
   }

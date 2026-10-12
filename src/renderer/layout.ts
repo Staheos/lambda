@@ -48,6 +48,16 @@ interface LayoutContext {
 
 const HORIZONTAL_GAP = 1.4;
 const LEVEL_GAP = 1.45;
+const DIAGRAM_COLORS = [
+  'hsl(344 86% 66%)',
+  'hsl(18 90% 65%)',
+  'hsl(50 92% 66%)',
+  'hsl(126 72% 63%)',
+  'hsl(174 76% 60%)',
+  'hsl(207 88% 67%)',
+  'hsl(245 86% 72%)',
+  'hsl(286 80% 69%)',
+] as const;
 
 export function layoutLambda(term: LambdaTerm): DiagramLayout {
   const size = measure(term);
@@ -222,7 +232,7 @@ function colorForTerm(term: LambdaTerm): string {
     return colorForId(term.id);
   }
   if (term.kind === 'variable') {
-    return 'hsl(205 18% 70%)';
+    return 'var(--diagram-free)';
   }
   return mixColors(colorForTerm(term.functionTerm), colorForTerm(term.argument));
 }
@@ -232,7 +242,7 @@ function colorForId(id: string): string {
   for (const character of id) {
     hash = (hash * 31 + character.charCodeAt(0)) % 360;
   }
-  return `hsl(${(hash * 1.7 + 145) % 360} 78% 64%)`;
+  return DIAGRAM_COLORS[hash % DIAGRAM_COLORS.length];
 }
 
 function mixColors(first: string, second: string): string {
@@ -244,7 +254,7 @@ function mixColors(first: string, second: string): string {
       difference -= Math.sign(difference) * 360;
     }
     const hue = (firstHue + difference / 2 + 360) % 360;
-    return `hsl(${hue} 72% 66%)`;
+    return `hsl(${hue} 82% 67%)`;
   }
   return first;
 }

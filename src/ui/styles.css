@@ -1,21 +1,23 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600&display=swap');
 
 :root {
-  color: #f3f4f5;
-  background: #090a0c;
+  color: #f0f0f0;
+  background: #191919;
   font-family: 'Manrope', sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --background: #090a0c;
-  --surface: #101215;
-  --surface-raised: #171a1f;
-  --border: #3a3e45;
-  --border-strong: #d6d9dd;
-  --muted: #7f858e;
-  --muted-bright: #b7bcc3;
-  --text: #f3f4f5;
-  --accent: #b0ff68;
-  --danger: #ff8580;
+  --background: #191919;
+  --surface: #202020;
+  --surface-raised: #292929;
+  --border: #484848;
+  --border-strong: #dedede;
+  --muted: #969696;
+  --muted-bright: #cecece;
+  --text: #f0f0f0;
+  --accent: #e6e6e6;
+  --accent-ink: #181818;
+  --danger: #ff7777;
+  --diagram-free: #d0d0d0;
 }
 
 * {
@@ -30,9 +32,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 50% 36%, rgb(255 255 255 / 2.5%), transparent 34%),
-    var(--background);
+  background: var(--background);
 }
 
 button,
@@ -73,7 +73,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #1f2227;
+  border-bottom: 1px solid #303030;
 }
 
 .brand,
@@ -96,7 +96,7 @@ button:disabled {
   height: 30px;
   display: grid;
   place-items: center;
-  border: 1px solid #4a4f57;
+  border: 1px solid #8a8a8a;
   border-radius: 50%;
   color: var(--accent);
   font-family: Georgia, serif;
@@ -136,7 +136,7 @@ button:disabled {
   margin: 0 auto 18px;
   display: grid;
   place-items: center;
-  border: 1px solid #51565d;
+  border: 1px solid #8a8a8a;
   border-radius: 50%;
   color: var(--accent);
   font-family: Georgia, serif;
@@ -146,7 +146,7 @@ button:disabled {
 
 .eyebrow {
   margin: 0 0 12px;
-  color: var(--accent);
+  color: #b9b9b9;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 10px;
   letter-spacing: 0.16em;
@@ -266,8 +266,8 @@ select option {
   content: '';
   width: 11px;
   height: 6px;
-  border-bottom: 2px solid #0c1009;
-  border-left: 2px solid #0c1009;
+  border-bottom: 2px solid var(--accent-ink);
+  border-left: 2px solid var(--accent-ink);
   opacity: 0;
   transform: translateY(-1px) rotate(-45deg);
 }
@@ -296,10 +296,10 @@ select option {
   min-height: 0;
   overflow: hidden;
   aspect-ratio: 1;
-  border: 2px solid #d9dcdf;
+  border: 2px solid #e2e2e2;
   border-radius: 17px;
-  background: #050607;
-  box-shadow: 0 26px 80px rgb(0 0 0 / 34%);
+  background: #000;
+  box-shadow: 0 20px 58px rgb(0 0 0 / 24%);
 }
 
 .canvas-wrap:fullscreen {
@@ -307,7 +307,7 @@ select option {
   height: 100vh;
   border: 0;
   border-radius: 0;
-  background: #050607;
+  background: #000;
 }
 
 .lambda-canvas {
@@ -326,17 +326,17 @@ select option {
   height: 32px;
   display: grid;
   place-items: center;
-  border: 1px solid #d6d9dd;
+  border: 1px solid #dedede;
   border-radius: 7px;
   color: #f1f2f4;
-  background: rgb(8 9 11 / 78%);
+  background: rgb(18 18 18 / 86%);
   font-family: 'IBM Plex Mono', monospace;
   font-size: 15px;
   transition: color 150ms ease, background 150ms ease;
 }
 
 .canvas-tool:hover {
-  color: #090b08;
+  color: var(--accent-ink);
   background: var(--accent);
 }
 
@@ -363,7 +363,7 @@ select option {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #a5abb3;
+  color: #a7a7a7;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 9px;
   pointer-events: none;
@@ -371,7 +371,7 @@ select option {
 
 .canvas-status > span:last-child {
   padding-left: 8px;
-  border-left: 1px solid #333840;
+  border-left: 1px solid #3b3b3b;
 }
 
 .status-dot {
@@ -379,7 +379,7 @@ select option {
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 0 4px rgb(176 255 104 / 8%);
+  box-shadow: 0 0 0 4px rgb(230 230 230 / 8%);
 }
 
 .status-dot.active {
@@ -401,11 +401,11 @@ textarea {
   height: 126px;
   padding: 15px;
   resize: vertical;
-  border: 1px solid #d6d9dd;
+  border: 1px solid #dedede;
   border-radius: 9px;
   outline: none;
-  color: #f0f2f4;
-  background: #08090b;
+  color: #f0f0f0;
+  background: #191919;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;
   line-height: 1.55;
@@ -414,8 +414,8 @@ textarea {
 
 textarea:hover,
 textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgb(176 255 104 / 7%);
+  border-color: #fff;
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 7%);
 }
 
 textarea.invalid {
@@ -453,7 +453,7 @@ textarea.invalid {
 .action-section button,
 .download-button {
   min-height: 39px;
-  border: 1px solid #d6d9dd;
+  border: 1px solid #dedede;
   border-radius: 8px;
   color: var(--text);
   background: transparent;
@@ -464,7 +464,7 @@ textarea.invalid {
 .action-section button:hover:not(:disabled),
 .download-button:hover:not(:disabled) {
   border-color: var(--accent);
-  color: #090b08;
+  color: var(--accent-ink);
   background: var(--accent);
 }
 
@@ -483,14 +483,14 @@ input[type='range'] {
   height: 2px;
   appearance: none;
   outline: none;
-  background: #d6d9dd;
+  background: #dedede;
 }
 
 input[type='range']::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   appearance: none;
-  border: 3px solid #08090b;
+  border: 3px solid #191919;
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
@@ -499,7 +499,7 @@ input[type='range']::-webkit-slider-thumb {
 .secondary-actions button {
   min-height: 34px;
   color: var(--muted-bright);
-  border-color: #484d55;
+  border-color: #696969;
 }
 
 .download-button {
@@ -511,7 +511,7 @@ input[type='range']::-webkit-slider-thumb {
 .history-section {
   margin-top: 28px;
   padding-top: 15px;
-  border-top: 1px solid #25292f;
+  border-top: 1px solid #3a3a3a;
 }
 
 .history-heading {
@@ -542,7 +542,7 @@ input[type='range']::-webkit-slider-thumb {
   padding: 6px 0;
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
-  border-top: 1px solid #1e2126;
+  border-top: 1px solid #303030;
   color: var(--muted);
 }
 
@@ -565,7 +565,7 @@ input[type='range']::-webkit-slider-thumb {
   padding-top: 24px;
   display: grid;
   grid-template-columns: 90px 1fr;
-  border-top: 1px solid #262a30;
+  border-top: 1px solid #3a3a3a;
 }
 
 .note-number {
@@ -595,7 +595,7 @@ footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid #1f2227;
+  border-top: 1px solid #303030;
   color: var(--muted);
   font-size: 10px;
 }
